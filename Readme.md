@@ -113,7 +113,3 @@ docker build -t weather-monitoring-system .
 ```bash
 docker run -p 3000:3000 --env-file .env weather-monitoring-system
 ```
-
-## Contributing
-
-Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests.
