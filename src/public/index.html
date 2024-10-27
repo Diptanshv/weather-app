@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Monitoring Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .current-weather {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .temperature {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        .refresh-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <button class="refresh-button" onclick="refreshData()">Refresh Data</button>
+        <div class="grid" id="currentWeather"></div>
+        <div class="card">
+            <h2>Temperature Trends (Last 7 Days)</h2>
+            <div class="chart-container">
+                <canvas id="temperatureChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let temperatureChart;
+
+        async function fetchCurrentWeather() {
+            try {
+                const response = await fetch('/api/current-weather');
+                console.log(response);
+                const data = await response.json();
+                console.log(data);
+                return data;
+            } catch (error) {
+                console.info('Error fetching current weather:', error);
+                return [];
+            }
+        }
+
+        async function fetchDailySummary() {
+            try {
+                const response = await fetch('/api/daily-summary');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching daily summary:', error);
+                return [];
+            }
+        }
+
+        function updateCurrentWeather(data) {
+            console.log(data);
+            const container = document.getElementById('currentWeather');
+            container.innerHTML = '';
+
+            data.forEach(city => {
+                const card = document.createElement('div');
+                card.className = 'card current-weather';
+                card.innerHTML = `
+                    <h3>${city.cityName}</h3>
+                    <div class="temperature">${city.temp.toFixed(1)}°C</div>
+                    <div>Feels like: ${city.feels_like.toFixed(1)}°C</div>
+                    <div>Weather: ${city.main}</div>
+                    <div>Last updated: ${new Date(city.timestamp).toLocaleString()}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateTemperatureChart(data) {
+            console.log("Here is: ");
+            console.log(data);
+            const groupedData = {};
+            
+            // Group data by city
+            data.forEach(entry => {
+                if (!groupedData[entry.cityName]) {
+                    groupedData[entry.cityName] = [];
+                }
+                groupedData[entry.cityName].push({
+                    date: new Date(entry.date).toLocaleDateString(),
+                    avgTemp: entry.avgTemp
+                });
+            });
+            console.log(groupedData);
+            const datasets = Object.entries(groupedData).map(([city, data]) => ({
+                label: city,
+                data: data.map(d => d.avgTemp),
+                borderColor: getRandomColor(),
+                fill: false
+            }));
+            // console.log(datasets);
+            const labels = Object.values(groupedData)[0]?.map(d => d.date) || [];
+
+            // console.log(labels);
+
+            if (temperatureChart) {
+                temperatureChart.destroy();
+            }
+
+            const ctx = document.getElementById('temperatureChart').getContext('2d');
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min:10, 
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        async function refreshData() {
+            const currentWeather = await fetchCurrentWeather();
+            const dailySummary = await fetchDailySummary();
+            
+            updateCurrentWeather(currentWeather);
+            updateTemperatureChart(dailySummary);
+        }
+
+        // Initial load
+        refreshData();
+        // Auto refresh every 5 minutes
+        setInterval(refreshData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
